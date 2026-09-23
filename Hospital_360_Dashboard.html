@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hospital 360 — Analytics Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --navy: #1F4E78; --navy-dark: #13324D; --steel: #61A5C2; --teal: #2CA58D;
+    --teal-light: #D7F0EA; --ink: #1A1A1A; --mute: #5B6770; --offwhite: #F5F8FA;
+    --warn: #C0392B; --border: #E3E9EE;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Calibri, Arial, sans-serif; margin: 0; background: var(--offwhite); color: var(--ink);
+  }
+  header {
+    background: var(--navy-dark); color: white; padding: 22px 32px 18px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: 0.5px; }
+  header .sub { font-size: 13px; color: #9FB6C4; margin-top: 2px; }
+  header .badge {
+    background: var(--warn); color: white; font-size: 11px; font-weight: 700; padding: 6px 12px;
+    border-radius: 20px; letter-spacing: 0.5px;
+  }
+  nav {
+    display: flex; background: white; border-bottom: 1px solid var(--border); padding: 0 24px;
+    overflow-x: auto; position: sticky; top: 0; z-index: 10;
+  }
+  nav button {
+    background: none; border: none; padding: 14px 18px; font-size: 13.5px; font-weight: 600;
+    color: var(--mute); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap;
+  }
+  nav button.active { color: var(--navy); border-bottom-color: var(--teal); }
+  nav button:hover { color: var(--navy); }
+  main { padding: 22px 28px 50px; max-width: 1400px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .kpi-card {
+    background: white; border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .kpi-card .num { font-size: 26px; font-weight: 700; color: var(--navy); }
+  .kpi-card .label { font-size: 12.5px; color: var(--mute); margin-top: 4px; }
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .chart-grid.single { grid-template-columns: 1fr; }
+  @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+  .chart-card {
+    background: white; border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .chart-card h3 { margin: 0 0 10px; font-size: 14px; color: var(--navy-dark); }
+  .chart-card canvas { max-height: 280px; }
+  .synthetic-banner {
+    background: #FCE4D6; color: var(--warn); font-weight: 700; font-size: 12.5px; padding: 10px 16px;
+    border-radius: 8px; margin-bottom: 18px; text-align: center;
+  }
+  .footnote { font-size: 11.5px; color: var(--mute); margin-top: 24px; line-height: 1.5; font-style: italic; }
+  .tag { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; margin-left:6px; }
+  .tag.synthetic { background:#FCE4D6; color:var(--warn); }
+  .tag.actual { background:#C6E0B4; color:#375623; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>HOSPITAL 360 — Analytics Dashboard</h1>
+    <div class="sub">Kangra–Palampur Corridor · 100-Bed Regional Multispecialty Hospital Model</div>
+  </div>
+  <div class="badge">SUBSTITUTE FOR POWER BI .PBIX — SEE NOTE BELOW</div>
+</header>
+
+<nav id="tabs">
+  <button data-view="exec" class="active">Executive Overview</button>
+  <button data-view="flow">Patient Flow</button>
+  <button data-view="capacity">Capacity &amp; Beds</button>
+  <button data-view="diag">Diagnostics &amp; Pharmacy</button>
+  <button data-view="quality">Quality &amp; Safety</button>
+  <button data-view="hr">HR &amp; Workforce</button>
+</nav>
+
+<main>
+
+<div class="view active" id="view-exec">
+  <div class="kpi-row" id="exec-kpis"></div>
+  <div class="chart-grid">
+    <div class="chart-card"><h3>10-Year Net Revenue &amp; EBITDA (₹ Crore) <span class="tag actual">MODEL — 12_Revenue / 11_OPEX</span></h3><canvas id="chartExecRevenue"></canvas></div>
+    <div class="chart-card"><h3>Occupancy Ramp &amp; PAT Trend <span class="tag actual">MODEL — 12_Revenue / 13_PL</span></h3><canvas id="chartExecOccPat"></canvas></div>
+  </div>
+  <div class="footnote">Executive Overview figures are the Base Case outputs of the formula-linked 10-year financial model (Hospital_360_HP_Master_Model.xlsx). They are Calculated Values built on Assumption/Benchmark inputs, not actuals from an operating hospital.</div>
+</div>
+
+<div class="view" id="view-flow">
+  <div class="synthetic-banner">⚠ SYNTHETIC DATA — generated to demonstrate this analytics view. Not real patient data.</div>
+  <div class="kpi-row" id="flow-kpis"></div>
+  <div class="chart-grid">
+    <div class="chart-card"><h3>OPD Footfall — New vs. Follow-up</h3><canvas id="chartOPD"></canvas></div>
+    <div class="chart-card"><h3>IPD Admissions &amp; ALOS</h3><canvas id="chartIPD"></canvas></div>
+    <div class="chart-card"><h3>Emergency Visits &amp; ER→Admission Rate</h3><canvas id="chartER"></canvas></div>
+    <div class="chart-card"><h3>OT Cases &amp; Utilisation Rate</h3><canvas id="chartOT"></canvas></div>
+  </div>
+</div>
+
+<div class="view" id="view-capacity">
+  <div class="synthetic-banner">⚠ SYNTHETIC DATA (occupancy trend) — Bed Mix reflects the planning model (Assumption/Calculated Value).</div>
+  <div class="chart-grid">
+    <div class="chart-card"><h3>Bed Occupancy by Ward — 24-Month Trend</h3><canvas id="chartOcc"></canvas></div>
+    <div class="chart-card"><h3>Bed Mix — Launch vs. Mature (Planning Model)</h3><canvas id="chartBedMix"></canvas></div>
+  </div>
+</div>
+
+<div class="view" id="view-diag">
+  <div class="synthetic-banner">⚠ SYNTHETIC DATA — generated to demonstrate this analytics view. Not real patient data.</div>
+  <div class="kpi-row" id="diag-kpis"></div>
+  <div class="chart-grid">
+    <div class="chart-card"><h3>Lab Tests &amp; Imaging Studies</h3><canvas id="chartLabImg"></canvas></div>
+    <div class="chart-card"><h3>Pharmacy Prescriptions &amp; Lab TAT</h3><canvas id="chartPharmTat"></canvas></div>
+  </div>
+</div>
+
+<div class="view" id="view-quality">
+  <div class="synthetic-banner">⚠ SYNTHETIC DATA — generated to demonstrate this analytics view. Not real patient data.</div>
+  <div class="kpi-row" id="quality-kpis"></div>
+  <div class="chart-grid">
+    <div class="chart-card"><h3>Safety Indicators (per 1,000 patient-days / doses)</h3><canvas id="chartSafety"></canvas></div>
+    <div class="chart-card"><h3>Patient Satisfaction (CSAT) Trend</h3><canvas id="chartCsat"></canvas></div>
+  </div>
+</div>
+
+<div class="view" id="view-hr">
+  <div class="synthetic-banner">⚠ SYNTHETIC DATA — generated to demonstrate this analytics view. Not real HR data.</div>
+  <div class="kpi-row" id="hr-kpis"></div>
+  <div class="chart-grid">
+    <div class="chart-card"><h3>Headcount Ramp-up</h3><canvas id="chartHeadcount"></canvas></div>
+    <div class="chart-card"><h3>Attrition &amp; Vacancy Rate</h3><canvas id="chartAttrition"></canvas></div>
+  </div>
+</div>
+
+<div class="footnote">
+  <strong>Note on Power BI:</strong> Power BI Desktop is not available in this environment to produce a native .pbix file. This HTML dashboard is delivered as a functional substitute, built on the same star-schema data (see the 29_Data_Dictionary sheet and Hospital_360_Synthetic_Data.xlsx) that would be imported into Power BI Desktop's Fact/Dimension model. All monthly analytics-layer figures across every tab except Executive Overview are clearly labelled SYNTHETIC — generated for this academic project to demonstrate the reporting architecture, and must never be read as real patient or hospital data.
+</div>
+
+</main>
+
+<script>
+const DATA = {"months": ["Apr-2025", "May-2025", "Jun-2025", "Jul-2025", "Aug-2025", "Sep-2025", "Oct-2025", "Nov-2025", "Dec-2025", "Jan-2026", "Feb-2026", "Mar-2026", "Apr-2026", "May-2026", "Jun-2026", "Jul-2026", "Aug-2026", "Sep-2026", "Oct-2026", "Nov-2026", "Dec-2026", "Jan-2027", "Feb-2027", "Mar-2027"], "opd_footfall": [6208.4, 5978.1, 5923.8, 5831.1, 6106.3, 6343.5, 6740, 6563.9, 6625.9, 6406.6, 6319.3, 6436.9, 6211.9, 6106.9, 6324.7, 6470.9, 6386.1, 6565.3, 6906.3, 6675.3, 7015.6, 7284.6, 7300.7, 7184], "opd_new": [2462, 2074, 1940, 1911, 2368, 2336, 2592, 2484, 2405, 2549, 2214, 2344, 2400, 2256, 2460, 2370, 2404, 2125, 2336, 2291, 2290, 2467, 2395, 2459], "opd_followup": [3746, 3904, 3984, 3920, 3738, 4008, 4148, 4080, 4221, 3858, 4105, 4093, 3812, 3851, 3865, 4101, 3982, 4440, 4570, 4384, 4726, 4818, 4906, 4725], "opd_conversion": [530.367, 445.926, 443.143, 398.732, 431.588, 618.277, 579.11, 553.765, 442.912, 571.245, 420.462, 483.915, 618.587, 522.751, 520.384, 565.457, 598.467, 597.705, 477.653, 409.089, 509.46, 515.091, 499.655, 701.995], "ipd_admissions": [302.5, 300.2, 313.2, 314.8, 339.6, 344.6, 340.9, 336.4, 345.9, 342.2, 352.8, 377.7, 380.7, 375.8, 405.6, 414.1, 404.1, 391.9, 382.2, 395.6, 416.6, 421.4, 410.3, 413.2], "alos": [4.3, 3.8, 4.3, 4.2, 3.3, 4, 4, 3.8, 3.6, 3.9, 3.4, 3.7, 3.8, 4.3, 4.2, 3.6, 3.8, 3.5, 4.2, 4.2, 3.6, 3.9, 3.9, 3.5], "patient_days": [1301, 1141, 1347, 1322, 1121, 1378, 1364, 1278, 1245, 1335, 1200, 1397, 1447, 1616, 1704, 1491, 1536, 1372, 1605, 1662, 1500, 1643, 1600, 1446], "readmission": [0.039, 0.033, 0.039, 0.033, 0.02, 0.028, 0.02, 0.043, 0.042, 0.041, 0.028, 0.021, 0.042, 0.044, 0.022, 0.032, 0.022, 0.039, 0.039, 0.023, 0.032, 0.034, 0.027, 0.042], "er_visits": [954, 930, 949.2, 994, 969.2, 958.7, 1038.9, 1074.4, 1082.3, 1100.9, 1067, 1046.4, 1040.5, 1067.9, 1048, 1026.5, 984.9, 1017.1, 996.3, 1065.1, 1128.9, 1088.8, 1070.3, 1108.8], "er_admit_rate": [0.197, 0.191, 0.255, 0.226, 0.218, 0.243, 0.245, 0.195, 0.188, 0.214, 0.214, 0.217, 0.238, 0.234, 0.259, 0.188, 0.212, 0.207, 0.249, 0.2, 0.195, 0.216, 0.214, 0.202], "ot_cases": [117.6, 128.1, 129.5, 139.1, 142.8, 137, 149.4, 158.8, 171, 182.6, 192.9, 190.4, 193.9, 192.3, 194.3, 189.7, 191.1, 204.3, 203.9, 213.4, 216.8, 219.7, 232.8, 247], "ot_util": [0.661, 0.694, 0.581, 0.609, 0.744, 0.666, 0.658, 0.7, 0.561, 0.667, 0.651, 0.721, 0.581, 0.742, 0.566, 0.587, 0.669, 0.685, 0.597, 0.574, 0.728, 0.599, 0.669, 0.674], "lab_tests": [9078.2, 9365.2, 9581.2, 10320.6, 10154.4, 10629.8, 10513.2, 10592.1, 11020.3, 10988.7, 10976.9, 11513.8, 11205.4, 11377, 12232.6, 13102.3, 12826.7, 12721.8, 12680.4, 13479.9, 14229.4, 14991.8, 15127.3, 14998.6], "imaging": [1502.8, 1578.4, 1635, 1776.8, 1846.9, 1773.5, 1880.1, 1872.7, 1946.8, 2084, 2043.8, 1998.5, 1950.5, 2001.4, 1990.4, 2053.7, 2143.5, 2120, 2192.5, 2183.5, 2224.6, 2359.9, 2484.6, 2442.9], "pharmacy_rx": [7554.8, 7456.3, 7069.2, 7481.1, 7759.7, 7649.5, 8040.5, 8239.4, 8311.8, 7946.6, 7643.6, 8183.5, 8754.9, 8960.4, 9473, 9730.1, 9535.8, 9316.2, 9282.6, 9868.6, 10357.2, 10922.3, 11537.8, 11441.1], "lab_tat": [1.9, 1.7, 2.7, 2.8, 2.1, 2.4, 1.7, 2.9, 2.8, 3, 2.7, 2.8, 1.5, 2.6, 2, 2.9, 2.7, 2.8, 2.7, 1.9, 2.7, 1.7, 2.8, 2.8], "occ_general": [0.333, 0.382, 0.374, 0.377, 0.42, 0.399, 0.399, 0.423, 0.444, 0.489, 0.508, 0.48, 0.514, 0.513, 0.561, 0.547, 0.584, 0.548, 0.612, 0.578, 0.638, 0.609, 0.613, 0.645], "occ_icu": [0.418, 0.399, 0.436, 0.443, 0.447, 0.476, 0.464, 0.515, 0.472, 0.56, 0.543, 0.572, 0.587, 0.596, 0.585, 0.576, 0.637, 0.624, 0.637, 0.694, 0.698, 0.678, 0.693, 0.715], "occ_maternity": [0.374, 0.378, 0.378, 0.405, 0.446, 0.441, 0.464, 0.457, 0.448, 0.473, 0.45, 0.477, 0.496, 0.515, 0.529, 0.528, 0.537, 0.533, 0.558, 0.594, 0.598, 0.57, 0.575, 0.611], "occ_blended": [0.375, 0.386, 0.396, 0.408, 0.438, 0.439, 0.442, 0.465, 0.455, 0.507, 0.5, 0.51, 0.532, 0.541, 0.558, 0.55, 0.586, 0.568, 0.602, 0.622, 0.645, 0.619, 0.627, 0.657], "rev_ipd": [98.9, 98.8, 105.3, 110.9, 115.6, 114.5, 113, 109.2, 108.2, 110.3, 117.3, 114.2, 115.6, 119.9, 118.5, 123.7, 126.3, 125.7, 130.5, 126.8, 133, 139.5, 137.3, 139.3], "rev_opd": [21.3, 23.2, 23.7, 22.6, 22.1, 23.7, 24, 25.5, 26.5, 28.7, 29.6, 31.7, 33.7, 34.7, 36, 36.7, 38.5, 39.4, 41.5, 43.1, 43.8, 43.7, 43.6, 44.9], "rev_diag": [19.1, 19.5, 20.2, 19.9, 19.1, 18.8, 18.5, 18.3, 18.7, 18, 17.6, 18.5, 19.4, 18.5, 18.5, 19, 19.1, 18.6, 18.7, 20.2, 20.8, 21.7, 23.2, 24.3], "rev_pharm": [13, 12.3, 12.2, 12.9, 13.7, 14.8, 14.9, 15.6, 15.9, 16.3, 16.1, 15.8, 16, 15.4, 15.3, 15.9, 16, 15.6, 15.8, 15.4, 15.8, 15.2, 15.3, 15.6], "rev_total": [152.3, 153.8, 161.4, 166.3, 170.5, 171.8, 170.4, 168.6, 169.3, 173.3, 180.6, 180.2, 184.7, 188.5, 188.3, 195.3, 199.9, 199.3, 206.5, 205.5, 213.4, 220.1, 219.4, 224.1], "hai_rate": [0.44, 1.3, 0.59, 1.05, 0.47, 0.93, 0.7, 0.86, 1.47, 0.93, 1.45, 1.56, 0.75, 0.51, 0.43, 1.16, 1.8, 0.89, 1.31, 1.49, 1.31, 1.46, 1.73, 0.68], "fall_rate": [0.11, 0.18, 0.16, 0.43, 0.38, 0.21, 0.45, 0.48, 0.18, 0.4, 0.47, 0.16, 0.51, 0.58, 0.15, 0.11, 0.26, 0.44, 0.58, 0.3, 0.46, 0.14, 0.45, 0.41], "med_error": [0.08, 0.28, 0.31, 0.23, 0.09, 0.35, 0.28, 0.15, 0.18, 0.16, 0.2, 0.15, 0.3, 0.3, 0.08, 0.34, 0.24, 0.3, 0.26, 0.18, 0.27, 0.34, 0.13, 0.29], "csat": [78.2, 78.3, 78.4, 80, 78.5, 81.2, 81.4, 78.8, 82.3, 80.1, 81.4, 82.3, 81.7, 80.7, 84.3, 82, 82.4, 85.1, 83.7, 86.2, 85.8, 84.5, 83.7, 87.8], "headcount": [128, 135, 137, 142, 146, 149, 152, 157, 156, 161, 167, 168, 174, 177, 181, 184, 189, 190, 196, 197, 201, 203, 207, 211], "attrition": [0.114, 0.136, 0.079, 0.082, 0.108, 0.132, 0.158, 0.112, 0.088, 0.07, 0.079, 0.083, 0.078, 0.061, 0.113, 0.087, 0.157, 0.115, 0.13, 0.073, 0.147, 0.109, 0.147, 0.117], "vacancy": [0.087, 0.084, 0.058, 0.045, 0.134, 0.088, 0.122, 0.08, 0.047, 0.103, 0.045, 0.055, 0.096, 0.07, 0.139, 0.052, 0.116, 0.101, 0.119, 0.063, 0.092, 0.085, 0.084, 0.126], "training_hrs": [8.9, 4.8, 6.7, 6.7, 7.4, 8.7, 4.2, 4.3, 7, 3.9, 4, 3.5, 3, 5.7, 6.6, 4.7, 4.4, 7.2, 7.2, 5.7, 7.1, 8.5, 7.7, 6.8], "annual_net_revenue": [1740.5, 2351.4, 3081.5, 3767.3, 4561.2, 4834.9, 5125, 5432.5, 5758.4, 6103.9], "annual_occupancy": [0.42, 0.5, 0.58, 0.63, 0.68, 0.68, 0.68, 0.68, 0.68, 0.68], "annual_ebitda": [-241.4, 19.5999999999999, 356.4, 600.5, 899.199999999999, 896.2, 888.400000000001, 875.300000000001, 855.999999999999, 829.8], "annual_ebitda_margin": [-0.138695777075553, 0.00833545972612057, 0.115657958786305, 0.159397977331245, 0.197141103218451, 0.185360607251443, 0.173346341463415, 0.161122871606075, 0.148652403445401, 0.135945870672849], "annual_pat": [-820.65, -525.525, -154.6, 92.7187499999997, 342.3375, 365.68125, 385.425, 401.193750000001, 412.312499999999, 418.25625], "annual_dscr": [-0.362326454033771, 0.0310065256080679, 0.595986622073579, 1.01014187541565, 1.48199622463426, 1.56228247162673, 1.64664138678223, 1.7351711026616, 1.8272409408773, 1.92239819004525], "bed_categories": ["General Ward \u2014 Medicine/Surgery", "General Ward \u2014 Paediatrics", "Maternity & Labour", "NICU", "ICU / HDU (adult)", "Semi-Private Rooms", "Private Rooms & Suites", "Dialysis bays (non-IPD, day-care)"], "bed_launch": [24, 6, 6, 4, 8, 14, 10, 6], "bed_mature": [30, 8, 8, 6, 12, 18, 12, 6]};
+const NAVY = "#1F4E78", TEAL = "#2CA58D", STEEL = "#61A5C2", WARN = "#C0392B", GOLD = "#C99A2E", MUTE = "#5B6770";
+
+function fmtPct(v) { return (v * 100).toFixed(1) + "%"; }
+function last(arr) { return arr[arr.length - 1]; }
+function avg(arr) { return arr.reduce((a,b)=>a+b,0) / arr.length; }
+
+Chart.defaults.font.family = "Segoe UI, Calibri, Arial, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = MUTE;
+
+function baseLineOpts(yLabel) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } } },
+    scales: { y: { title: { display: !!yLabel, text: yLabel }, grid: { color: '#EEF2F5' } }, x: { grid: { display: false } } },
+  };
+}
+
+// ---------------- Executive Overview ----------------
+(function() {
+  const years = DATA.annual_net_revenue.map((_,i)=>`Yr ${i+1}`);
+  const kpis = [
+    [ (last(DATA.annual_net_revenue)).toFixed(1) + " Cr", "Year 10 Net Revenue" ],
+    [ fmtPct(last(DATA.annual_ebitda_margin)), "Year 10 EBITDA Margin" ],
+    [ fmtPct(last(DATA.annual_occupancy)), "Year 10 Occupancy" ],
+    [ last(DATA.annual_dscr).toFixed(2) + "x", "Year 10 DSCR" ],
+  ];
+  document.getElementById('exec-kpis').innerHTML = kpis.map(([n,l])=>`<div class="kpi-card"><div class="num">${n}</div><div class="label">${l}</div></div>`).join('');
+
+  new Chart(document.getElementById('chartExecRevenue'), {
+    type: 'line',
+    data: { labels: years, datasets: [
+      { label: 'Net Revenue (₹ Cr)', data: DATA.annual_net_revenue, borderColor: NAVY, backgroundColor: NAVY, tension: 0.3 },
+      { label: 'EBITDA (₹ Cr)', data: DATA.annual_ebitda, borderColor: TEAL, backgroundColor: TEAL, tension: 0.3 },
+    ]},
+    options: baseLineOpts('₹ Crore'),
+  });
+  new Chart(document.getElementById('chartExecOccPat'), {
+    type: 'line',
+    data: { labels: years, datasets: [
+      { label: 'Occupancy %', data: DATA.annual_occupancy.map(v=>v*100), borderColor: STEEL, backgroundColor: STEEL, tension: 0.3, yAxisID: 'y' },
+      { label: 'PAT (₹ Cr)', data: DATA.annual_pat, borderColor: GOLD, backgroundColor: GOLD, tension: 0.3, yAxisID: 'y1' },
+    ]},
+    options: { ...baseLineOpts(), scales: {
+      y: { position: 'left', title: { display: true, text: 'Occupancy %' }, grid: { color: '#EEF2F5' } },
+      y1: { position: 'right', title: { display: true, text: 'PAT (₹ Cr)' }, grid: { display: false } },
+      x: { grid: { display: false } },
+    }},
+  });
+})();
+
+// ---------------- Patient Flow ----------------
+(function() {
+  const m = DATA.months;
+  const kpis = [
+    [ Math.round(last(DATA.opd_footfall)).toLocaleString(), "Latest Month OPD Footfall" ],
+    [ Math.round(last(DATA.ipd_admissions)).toLocaleString(), "Latest Month IPD Admissions" ],
+    [ avg(DATA.alos).toFixed(1) + " days", "Avg. ALOS (24-mo)" ],
+    [ fmtPct(avg(DATA.opd_conversion)), "Avg. OPD→IPD Conversion" ],
+  ];
+  document.getElementById('flow-kpis').innerHTML = kpis.map(([n,l])=>`<div class="kpi-card"><div class="num">${n}</div><div class="label">${l}</div></div>`).join('');
+
+  new Chart(document.getElementById('chartOPD'), {
+    type: 'bar',
+    data: { labels: m, datasets: [
+      { label: 'New Patients', data: DATA.opd_new, backgroundColor: NAVY, stack: 's' },
+      { label: 'Follow-up Patients', data: DATA.opd_followup, backgroundColor: STEEL, stack: 's' },
+    ]},
+    options: { ...baseLineOpts('Patients/month'), scales: { ...baseLineOpts().scales, x: { stacked: true, grid: {display:false} }, y: { stacked: true, grid: { color: '#EEF2F5' } } } },
+  });
+  new Chart(document.getElementById('chartIPD'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'IPD Admissions', data: DATA.ipd_admissions, borderColor: NAVY, backgroundColor: NAVY, tension: 0.3, yAxisID: 'y' },
+      { label: 'ALOS (days)', data: DATA.alos, borderColor: GOLD, backgroundColor: GOLD, tension: 0.3, yAxisID: 'y1' },
+    ]},
+    options: { ...baseLineOpts(), scales: {
+      y: { position: 'left', title: { display: true, text: 'Admissions' }, grid: { color: '#EEF2F5' } },
+      y1: { position: 'right', title: { display: true, text: 'ALOS (days)' }, grid: { display: false } },
+      x: { grid: { display: false } },
+    }},
+  });
+  new Chart(document.getElementById('chartER'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'ER Visits', data: DATA.er_visits, borderColor: WARN, backgroundColor: WARN, tension: 0.3, yAxisID: 'y' },
+      { label: 'ER→Admission Rate', data: DATA.er_admit_rate.map(v=>v*100), borderColor: STEEL, backgroundColor: STEEL, tension: 0.3, yAxisID: 'y1' },
+    ]},
+    options: { ...baseLineOpts(), scales: {
+      y: { position: 'left', title: { display: true, text: 'Visits/month' }, grid: { color: '#EEF2F5' } },
+      y1: { position: 'right', title: { display: true, text: 'Admission %' }, grid: { display: false } },
+      x: { grid: { display: false } },
+    }},
+  });
+  new Chart(document.getElementById('chartOT'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'OT Cases', data: DATA.ot_cases, borderColor: TEAL, backgroundColor: TEAL, tension: 0.3, yAxisID: 'y' },
+      { label: 'OT Utilisation', data: DATA.ot_util.map(v=>v*100), borderColor: NAVY, backgroundColor: NAVY, tension: 0.3, yAxisID: 'y1' },
+    ]},
+    options: { ...baseLineOpts(), scales: {
+      y: { position: 'left', title: { display: true, text: 'OT Cases' }, grid: { color: '#EEF2F5' } },
+      y1: { position: 'right', title: { display: true, text: 'Utilisation %' }, grid: { display: false } },
+      x: { grid: { display: false } },
+    }},
+  });
+})();
+
+// ---------------- Capacity & Beds ----------------
+(function() {
+  const m = DATA.months;
+  new Chart(document.getElementById('chartOcc'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'General Ward', data: DATA.occ_general.map(v=>v*100), borderColor: STEEL, backgroundColor: STEEL, tension: 0.3 },
+      { label: 'ICU/HDU', data: DATA.occ_icu.map(v=>v*100), borderColor: WARN, backgroundColor: WARN, tension: 0.3 },
+      { label: 'Maternity', data: DATA.occ_maternity.map(v=>v*100), borderColor: GOLD, backgroundColor: GOLD, tension: 0.3 },
+      { label: 'Blended', data: DATA.occ_blended.map(v=>v*100), borderColor: NAVY, backgroundColor: NAVY, tension: 0.3, borderWidth: 3 },
+    ]},
+    options: baseLineOpts('Occupancy %'),
+  });
+  new Chart(document.getElementById('chartBedMix'), {
+    type: 'bar',
+    data: { labels: DATA.bed_categories.map(c=>c.length>22?c.slice(0,22)+'…':c), datasets: [
+      { label: 'Launch', data: DATA.bed_launch, backgroundColor: STEEL },
+      { label: 'Mature (Yr5)', data: DATA.bed_mature, backgroundColor: NAVY },
+    ]},
+    options: { ...baseLineOpts('Beds'), indexAxis: 'y' },
+  });
+})();
+
+// ---------------- Diagnostics & Pharmacy ----------------
+(function() {
+  const m = DATA.months;
+  const kpis = [
+    [ Math.round(last(DATA.lab_tests)).toLocaleString(), "Latest Month Lab Tests" ],
+    [ Math.round(last(DATA.imaging)).toLocaleString(), "Latest Month Imaging Studies" ],
+    [ Math.round(last(DATA.pharmacy_rx)).toLocaleString(), "Latest Month Rx Filled" ],
+    [ avg(DATA.lab_tat).toFixed(1) + " hrs", "Avg. Lab TAT" ],
+  ];
+  document.getElementById('diag-kpis').innerHTML = kpis.map(([n,l])=>`<div class="kpi-card"><div class="num">${n}</div><div class="label">${l}</div></div>`).join('');
+
+  new Chart(document.getElementById('chartLabImg'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'Lab Tests', data: DATA.lab_tests, borderColor: NAVY, backgroundColor: NAVY, tension: 0.3 },
+      { label: 'Imaging Studies', data: DATA.imaging, borderColor: TEAL, backgroundColor: TEAL, tension: 0.3 },
+    ]},
+    options: baseLineOpts('Volume/month'),
+  });
+  new Chart(document.getElementById('chartPharmTat'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'Pharmacy Rx Filled', data: DATA.pharmacy_rx, borderColor: STEEL, backgroundColor: STEEL, tension: 0.3, yAxisID: 'y' },
+      { label: 'Lab TAT (hrs)', data: DATA.lab_tat, borderColor: WARN, backgroundColor: WARN, tension: 0.3, yAxisID: 'y1' },
+    ]},
+    options: { ...baseLineOpts(), scales: {
+      y: { position: 'left', title: { display: true, text: 'Rx/month' }, grid: { color: '#EEF2F5' } },
+      y1: { position: 'right', title: { display: true, text: 'TAT (hrs)' }, grid: { display: false } },
+      x: { grid: { display: false } },
+    }},
+  });
+})();
+
+// ---------------- Quality & Safety ----------------
+(function() {
+  const m = DATA.months;
+  const kpis = [
+    [ avg(DATA.hai_rate).toFixed(2), "Avg. HAI Rate /1,000 pt-days" ],
+    [ avg(DATA.fall_rate).toFixed(2), "Avg. Fall Rate /1,000 pt-days" ],
+    [ avg(DATA.med_error).toFixed(2), "Avg. Medication Error /1,000 doses" ],
+    [ last(DATA.csat).toFixed(1) + "%", "Latest CSAT Score" ],
+  ];
+  document.getElementById('quality-kpis').innerHTML = kpis.map(([n,l])=>`<div class="kpi-card"><div class="num">${n}</div><div class="label">${l}</div></div>`).join('');
+
+  new Chart(document.getElementById('chartSafety'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'HAI Rate', data: DATA.hai_rate, borderColor: WARN, backgroundColor: WARN, tension: 0.3 },
+      { label: 'Fall Rate', data: DATA.fall_rate, borderColor: GOLD, backgroundColor: GOLD, tension: 0.3 },
+      { label: 'Medication Error Rate', data: DATA.med_error, borderColor: STEEL, backgroundColor: STEEL, tension: 0.3 },
+    ]},
+    options: baseLineOpts('Rate'),
+  });
+  new Chart(document.getElementById('chartCsat'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'CSAT %', data: DATA.csat, borderColor: TEAL, tension: 0.3, fill: true, backgroundColor: 'rgba(44,165,141,0.12)' },
+    ]},
+    options: baseLineOpts('CSAT %'),
+  });
+})();
+
+// ---------------- HR & Workforce ----------------
+(function() {
+  const m = DATA.months;
+  const kpis = [
+    [ Math.round(last(DATA.headcount)).toLocaleString(), "Latest Total Headcount" ],
+    [ fmtPct(avg(DATA.attrition)), "Avg. Monthly Attrition" ],
+    [ fmtPct(avg(DATA.vacancy)), "Avg. Vacancy Rate" ],
+    [ avg(DATA.training_hrs).toFixed(1) + " hrs", "Avg. Training Hrs/Employee" ],
+  ];
+  document.getElementById('hr-kpis').innerHTML = kpis.map(([n,l])=>`<div class="kpi-card"><div class="num">${n}</div><div class="label">${l}</div></div>`).join('');
+
+  new Chart(document.getElementById('chartHeadcount'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'Total Headcount', data: DATA.headcount, borderColor: NAVY, tension: 0.3, fill: true, backgroundColor: 'rgba(31,78,120,0.10)' },
+    ]},
+    options: baseLineOpts('FTE'),
+  });
+  new Chart(document.getElementById('chartAttrition'), {
+    type: 'line',
+    data: { labels: m, datasets: [
+      { label: 'Attrition Rate', data: DATA.attrition.map(v=>v*100), borderColor: WARN, backgroundColor: WARN, tension: 0.3 },
+      { label: 'Vacancy Rate', data: DATA.vacancy.map(v=>v*100), borderColor: STEEL, backgroundColor: STEEL, tension: 0.3 },
+    ]},
+    options: baseLineOpts('%'),
+  });
+})();
+
+// ---------------- Tab switching ----------------
+document.getElementById('tabs').addEventListener('click', function(e) {
+  if (e.target.tagName !== 'BUTTON') return;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById('view-' + e.target.dataset.view).classList.add('active');
+});
+</script>
+
+</body>
+</html>
